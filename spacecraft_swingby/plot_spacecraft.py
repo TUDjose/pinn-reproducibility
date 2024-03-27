@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-from main import Net
+from pinn_sc import Net
 
 
 # load data
