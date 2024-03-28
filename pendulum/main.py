@@ -64,7 +64,7 @@ theta_tt = None
 losses = []
 
 
-def pinn_loss(theta, torq, t, loss_weights=[10, 1, 1]):
+def pinn_loss(theta, torq, t, loss_weights=[10, 1, 1], save_losses=True):
     # Calculate derivatives
     global theta_t
     global theta_tt
@@ -93,7 +93,8 @@ def pinn_loss(theta, torq, t, loss_weights=[10, 1, 1]):
     L_phys = loss_weights[1] * L_phys
     L_goal = loss_weights[2] * L_goal
 
-    losses.append((L_con, L_phys, L_goal))
+    if save_losses:
+        losses.append((L_con, L_phys, L_goal))
 
     return L_con + L_phys + L_goal
     
@@ -147,11 +148,11 @@ def train(model, optimizer, steps):
             print(loss)
 
     # Define closure for L-BFGS
-    def closure(time_domain):
+    def closure(time_domain, save_losses=False):
         optimizer.zero_grad()        
         u = model(time_domain)
         theta, torq = u[:, 0], u[:, 1]
-        loss = pinn_loss(theta, torq, time_domain, loss_weights=loss_weights)
+        loss = pinn_loss(theta, torq, time_domain, loss_weights=loss_weights, save_losses=save_losses)
         loss.backward()
         return loss
     
@@ -166,7 +167,7 @@ def train(model, optimizer, steps):
             # if n % period == 0:
             #     time_domain = sample_points(tmin, tmax)
             optimizer.step(lambda: closure(time_domain))
-            loss = closure(time_domain)
+            loss = closure(time_domain, save_losses=False)
             print(loss)
     except KeyboardInterrupt:
         print("Interrupted")
@@ -181,8 +182,8 @@ def plot_output(model):
 
     plt.subplot(1, 2, 1)  
     plt.plot(time_domain.detach().numpy(), [y[0] for y in u], label="theta")
-    plt.plot(time_domain.detach().numpy(), theta_t.reshape((-1, 1)).detach().numpy(), label="theta_t")
-    plt.plot(time_domain.detach().numpy(), theta_tt.reshape((-1, 1)).detach().numpy(), label="theta_tt")
+    plt.plot(time_domain.detach().numpy(), theta_t.reshape((-1, 1)).detach().numpy(), label="theta_t", alpha=0.5)
+    plt.plot(time_domain.detach().numpy(), theta_tt.reshape((-1, 1)).detach().numpy(), label="theta_tt", alpha=0.5)
 
     # plt.plot(time_domain.detach().numpy(), [torch.tanh(y[1]) * max_torq for y in u], label="torque")
     plt.plot(time_domain.detach().numpy(), [torch.tanh(y[1]) for y in u], label="torque")
