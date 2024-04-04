@@ -5,6 +5,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 from torch.autograd import grad
 import time
+import random
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device = torch.device('cpu')
 
@@ -39,18 +40,31 @@ class PINN():
         ]
 
         self.n_output = 2
-        self.n_adam = 5000
+        self.n_adam = 2000
         self.n_lbfgs = 4000
         self.n_domain = 1000
         self.lr_adam, self.lr_lbfgs = 4e-3, 3.8e-3
+        # self.lr_adam, self.lr_lbfgs = 1e-3, 1e-3
         self.xT, self.xTT = None, None
         self.yT, self.yTT = None, None
 
         self.weights = [10., 1.]
 
         self.net = Net([1] + [64] * 3 + [self.n_output])
+        self.net.to(device)
         self.time_domain = torch.linspace(self.tmin, self.tmax, self.n_domain, requires_grad=True).reshape((self.n_domain, 1)).to(device)
         self.T = torch.autograd.Variable(torch.tensor([1], dtype=torch.float32).to(device), requires_grad=True)
+
+    def pde_resampler(self):
+        points = [self.tmin]
+        points += [random.uniform(self.tmin, self.tmax) for _ in range(self.n_domain-2)]
+        points += [self.tmax]
+        points.sort()
+
+        points_tensor = torch.tensor(points).reshape((self.n_domain, 1)).to(device)
+        points_tensor.requires_grad = True
+
+        return points_tensor
 
     def constraint_loss(self, x, y, x_T, x_TT, y_T, y_TT, t):
         return ((x[0] - self.x0) ** 2 + (y[0] - self.y0) ** 2 + (x[-1] - self.x1) ** 2 + (y[-1] - self.y1) ** 2)
@@ -78,6 +92,7 @@ class PINN():
     def train(self, model, optimizer, steps):
         model.train()
 
+        print("Adam...")
         for n in range(steps):
             u = model(self.time_domain)
             x, y = u[:, 0], u[:, 1]
@@ -86,6 +101,9 @@ class PINN():
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+
+            if n % 100 == 0:
+                self.time_domain = self.pde_resampler()
 
             if n % 1000 == 0:
                 print(f"Step {n}, Loss: {loss.item()}, T: {self.T.item()}")
@@ -105,7 +123,8 @@ class PINN():
                 optimizer.step(closure)
                 loss = closure()
                 if n % 100 == 0:
-                    print(f"Step {n}, Loss: {loss.item()}, T: {self.T.item()}")
+                    self.time_domain = self.pde_resampler()
+                print(f"Step {n}, Loss: {loss.item()}, T: {self.T.item()}")
         except KeyboardInterrupt:
             pass
 
@@ -151,7 +170,8 @@ class PINN():
                 optimizer.step(closure)
                 loss = closure()
                 if n % 100 == 0:
-                    print(f"Step {n}, Loss: {loss.item()}, T: {self.T.item()}")
+                    self.time_domain = self.pde_resampler()
+                print(f"Step {n}, Loss: {loss.item()}, T: {self.T.item()}")
         except KeyboardInterrupt:
             pass
 
@@ -169,11 +189,22 @@ if __name__ == '__main__':
     # pinn.train(pinn.net, optimizer, pinn.n_adam)
     # pinn.plot(pinn.net)
 
-    file1 = 'data/model_20240327-231114.pt'
+    # file1 = 'data/model_20240328-141516.pt'
+    # checkpoint = torch.load(file1)
+    # pinn.net.load_state_dict(checkpoint['model_state_dict'])
+    # pinn.T = torch.autograd.Variable(torch.tensor([1.9], dtype=torch.float32).to(device), requires_grad=True)
+    # optimizer = torch.optim.LBFGS(list(pinn.net.parameters()) + [pinn.T], lr=0.05)
+    # pinn.retrain(pinn.net, optimizer, 4000)
+    # pinn.plot(pinn.net)
+    # with open('data/T.txt', 'w') as f:
+    #     f.write(f"{pinn.T.item()}\n")
+
+    file1 = 'data/model_20240328-182213.pt'
     checkpoint = torch.load(file1)
     pinn.net.load_state_dict(checkpoint['model_state_dict'])
-    optimizer = torch.optim.LBFGS(list(pinn.net.parameters()) + [pinn.T], lr=0.05)
-    pinn.retrain(pinn.net, optimizer, 6000)
+    pinn.T = torch.autograd.Variable(torch.tensor([2.0988], dtype=torch.float32).to(device), requires_grad=True)
+    optimizer = torch.optim.LBFGS(list(pinn.net.parameters()) + [pinn.T], lr=0.07)
+    pinn.retrain(pinn.net, optimizer, 4000)
     pinn.plot(pinn.net)
     with open('data/T.txt', 'w') as f:
         f.write(f"{pinn.T.item()}\n")
