@@ -88,9 +88,9 @@ Using the paper's existing code as a starting point, we created our own implemen
 
 With this, the spacecraft swingby PINN was trained, and the trajectory of the spacecraft, as well as the thrust exerted by gthe spacecraft and the gravity forces acting on it were plotted. 
 
-<img src="spacecraft_swingby/data/trajectory.png" width="250">
+<img src="spacecraft_swingby/data/trajectory.png" width="500">
 
-<img src="spacecraft_swingby/data/forces.png" width="400">
+<img src="spacecraft_swingby/data/forces.png" width="800">
 
 Comparing these plots to the ones that ought to be reproduced from the paper (namely Figure 4. of the paper), it seems that the results are quite agreeable, where for most of the trajectory, the thrust required to swing the spacecraft between the bodies is very low. The actual trajectory is also practically the same, where especially at the boundary conditions, the same accuracy is not met. However, it seems that the total loss achieved by our implementation is greater than that of the paper, since the required thrust is higher (not as minimal as the method would lead it to be) and thrust values are noisier. 
 
