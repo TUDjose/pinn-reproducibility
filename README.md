@@ -68,7 +68,7 @@ $$
 (x, y) = 
 \begin{cases}
     (-1, -1) \text{ at } t_N = 0 \\
-    \quad (1, 1) \;\;\text{ at } t_N = 1
+    \quad (1, 1) \text{ at } t_N = 1
 \end{cases}
 $$
 
