@@ -11,6 +11,10 @@ device = torch.device('cpu')
 
 
 class Net(nn.Module):
+    """
+    Forward neural network architecture for the PINN. Network consists of 1 input (time), 3 hidden layers with 64 neurons each,
+    and 2 outputs (x and y positions of the spacecraft). A tanh activation function is used for all hidden layers and the output layer.
+    """
     def __init__(self, layers):
         super().__init__()
         self.linears = nn.ModuleList([
@@ -28,27 +32,39 @@ class Net(nn.Module):
 
 
 class PINN():
-    def __init__(self):
+    """
+    This class holds the PINN for the spacecraft swingby problem.
+        :param bh_xygm: List of lists containing the x, y, and gravitational mass of the black holes.
+        :param lr_adam: Learning rate for the Adam optimizer.
+        :param lr_lbfgs: Learning rate for the L-BFGS optimizer.
+        :param n_adam: Number of Adam iterations.
+        :param n_lbfgs: Number of L-BFGS iterations.
+        :param weights: Tuple of weights for the constraint and physics loss functions.
+
+    To run and train the PINN, run the following commands:
+        pinn = PINN()
+        optimizer = torch.optim.Adam(list(pinn.net.parameters()) + [pinn.T], lr=pinn.lr_adam)
+            -> [trains both the model parameters and the external T variable]
+        pinn.train(pinn.net, optimizer, pinn.n_adam)
+        pinn.plot(pinn.net)
+    """
+    def __init__(self, bh_xygm=None, lr_adam=4e-3, lr_lbfgs=3.8e-3, n_adam=2000, n_lbfgs=4000, weights=(10., 1.)):
         self.tmin, self.tmax = 0.0, 1.0
         self.x0, self.y0 = -1., -1.
         self.x1, self.y1 = 1., 1.
-        self.m0 = 1.
-        self.bh_xygm = [
-            [-0.5, -1.0, 0.5],
-            [-0.2, 0.4, 1.0],
-            [0.8, 0.3, 0.5],
-        ]
+        self.bh_xygm = [[-0.5, -1.0, 0.5],
+                        [-0.2, 0.4, 1.0],
+                        [0.8, 0.3, 0.5],] if bh_xygm is None else bh_xygm
 
         self.n_output = 2
-        self.n_adam = 2000
-        self.n_lbfgs = 4000
+        self.n_adam = n_adam
+        self.n_lbfgs = n_lbfgs
         self.n_domain = 1000
-        self.lr_adam, self.lr_lbfgs = 4e-3, 3.8e-3
-        # self.lr_adam, self.lr_lbfgs = 1e-3, 1e-3
+        self.lr_adam, self.lr_lbfgs = lr_adam, lr_lbfgs
         self.xT, self.xTT = None, None
         self.yT, self.yTT = None, None
 
-        self.weights = [10., 1.]
+        self.weights = weights
 
         self.net = Net([1] + [64] * 3 + [self.n_output])
         self.net.to(device)
@@ -56,6 +72,9 @@ class PINN():
         self.T = torch.autograd.Variable(torch.tensor([1], dtype=torch.float32).to(device), requires_grad=True)
 
     def pde_resampler(self):
+        """
+        Randomly resample the time domain for the spacecraft swingby problem. This is called every 100 epochs during training.
+        """
         points = [self.tmin]
         points += [random.uniform(self.tmin, self.tmax) for _ in range(self.n_domain-2)]
         points += [self.tmax]
@@ -73,14 +92,18 @@ class PINN():
         ode_x = x_TT
         ode_y = y_TT
         for xtmp, ytmp, gmtmp in self.bh_xygm:
-            ode_x += (gmtmp * self.m0 * (x.reshape((-1, 1)) - xtmp) /
+            ode_x += (gmtmp * (x.reshape((-1, 1)) - xtmp) /
                       ((x.reshape((-1, 1)) - xtmp) ** 2 + (y.reshape((-1, 1)) - ytmp) ** 2) ** 1.5)
-            ode_y += (gmtmp * self.m0 * (y.reshape((-1, 1)) - ytmp) /
+            ode_y += (gmtmp * (y.reshape((-1, 1)) - ytmp) /
                       ((x.reshape((-1, 1)) - xtmp) ** 2 + (y.reshape((-1, 1)) - ytmp) ** 2) ** 1.5)
 
         return torch.mean(torch.norm(ode_x, p=2) ** 2) + torch.mean(torch.norm(ode_y, p=2) ** 2)
 
     def pinn_loss(self, x, y, t, loss_weights, loss_fns):
+        """
+        Defines the loss function for the PINN, as a weighted combination of the constraint and physics loss functions, to be minimized,
+        hence enforcing the initial & final positions and the overall physics of the spacecraft swingby problem.
+        """
         x_T = grad(x, t, grad_outputs=torch.ones_like(x), create_graph=True)[0].reshape((-1, 1)).to(device) / self.T
         y_T = grad(y, t, grad_outputs=torch.ones_like(y), create_graph=True)[0].reshape((-1, 1)).to(device) / self.T
         self.x_TT = grad(x_T, t, grad_outputs=torch.ones_like(x_T), create_graph=True)[0].reshape((-1, 1)).to(device) / self.T
@@ -90,6 +113,10 @@ class PINN():
 
 
     def train(self, model, optimizer, steps):
+        """
+        Training of the PINN, first by applying the Adam optimizer for n_adam epochs, then the L-BFGS optimizer for n_lbfgs epochs.
+        Model checkpoint is saved at the end of training in the /data/ directory.
+        """
         model.train()
 
         print("Adam...")
@@ -137,6 +164,10 @@ class PINN():
 
 
     def plot(self, model):
+        """
+        Plots trajectory of the spacecraft with respect to the other astronomical bodies in the system.
+        Plots saved in the /data/ directory.
+        """
         model.eval()
         with torch.no_grad():
             u = [model(t.reshape(1)).to(device) for t in self.time_domain]
@@ -154,6 +185,11 @@ class PINN():
 
 
     def retrain(self, model, optimizer, steps):
+        """
+        Can optionally retrain the model with a different optimizer and number of epochs.
+        Useful to further reduce the loss function and improve the accuracy of the model.
+        Model checkpoint is saved at the end of training in the /data/ directory.
+        """
         model.train()
 
         def closure():
@@ -185,9 +221,12 @@ class PINN():
 
 if __name__ == '__main__':
     pinn = PINN()
-    # optimizer = torch.optim.Adam(list(pinn.net.parameters()) + [pinn.T], lr=pinn.lr_adam)
-    # pinn.train(pinn.net, optimizer, pinn.n_adam)
-    # pinn.plot(pinn.net)
+    optimizer = torch.optim.Adam(list(pinn.net.parameters()) + [pinn.T], lr=pinn.lr_adam)
+    pinn.train(pinn.net, optimizer, pinn.n_adam)
+    pinn.plot(pinn.net)
+    optimizer = torch.optim.LBFGS(list(pinn.net.parameters()) + [pinn.T], lr=0.05)
+    pinn.retrain(pinn.net, optimizer, 4000)
+    pinn.plot(pinn.net)
 
     # file1 = 'data/model_20240328-141516.pt'
     # checkpoint = torch.load(file1)
@@ -199,12 +238,13 @@ if __name__ == '__main__':
     # with open('data/T.txt', 'w') as f:
     #     f.write(f"{pinn.T.item()}\n")
 
-    file1 = 'data/model_20240328-182213.pt'
-    checkpoint = torch.load(file1)
-    pinn.net.load_state_dict(checkpoint['model_state_dict'])
-    pinn.T = torch.autograd.Variable(torch.tensor([2.0988], dtype=torch.float32).to(device), requires_grad=True)
-    optimizer = torch.optim.LBFGS(list(pinn.net.parameters()) + [pinn.T], lr=0.07)
-    pinn.retrain(pinn.net, optimizer, 4000)
-    pinn.plot(pinn.net)
-    with open('data/T.txt', 'w') as f:
-        f.write(f"{pinn.T.item()}\n")
+    # file1 = 'data/model_20240328-182213.pt'
+    # checkpoint = torch.load(file1)
+    # pinn.net.load_state_dict(checkpoint['model_state_dict'])
+    # pinn.T = torch.autograd.Variable(torch.tensor([2.0988], dtype=torch.float32).to(device), requires_grad=True)
+    # optimizer = torch.optim.LBFGS(list(pinn.net.parameters()) + [pinn.T], lr=0.07)
+    # pinn.retrain(pinn.net, optimizer, 4000)
+    # pinn.plot(pinn.net)
+    # with open('data/T.txt', 'w') as f:
+    #     f.write(f"{pinn.T.item()}\n")
+
