@@ -108,15 +108,15 @@ architecture and the training steps taken.
 Using the paper's existing code as a starting point, we created our own implementation of the PINN using the pytorch library. The same 
 network architecture was used (1 input, 3 hidden layers with 64 nodes, and 2 outputs), using the $tanh$ activation function for all 
 layers and Glorot normal initialization of parameters. Unlike the paper, a random seed was not selected, somewhat demonstrating a better 
-robustness of out method. The training parameters however differ greatly from the paper. The loss functions weights were updated to  $\
-{w_{phys}, w_{con}\} = \{1, 10\}$, to ensure that the boundary conditions are met. Without this, the boundary conditions were never met. 
+robustness of out method. The training parameters however differ greatly from the paper. The loss functions weights were updated to      
+$\{w_{phys}, w_{con}\} = \{1, 10\}$, to ensure that the boundary conditions are met. Without this, the boundary conditions were never met. 
 The learning rate was also increased to $0.004$, in part to account for the larger weights, in order to reduce the loss. The same number 
 of training epochs were used for the Adam optimizer ($2000$), though for the L-BFGS, many more were required (closer to $8000$ to reach 
 convergence). Also, for the latter half of the L-BFGS training, the learning rate was further increased to $0.05$, in order to decrease 
-the loss, while mainting stability in the earlier parts of training. Input point resampling and the training of the variable $T$ were 
+the loss, while maintaining stability in the earlier parts of training. Input point resampling and the training of the variable $T$ were 
 also implemented using the existing code as reference, which helped in having more stability at higher learning rates. 
 
-With this, the spacecraft swingby PINN was trained, and the trajectory of the spacecraft, as well as the thrust exerted by gthe 
+With this, the spacecraft swingby PINN was trained, and the trajectory of the spacecraft, as well as the thrust exerted by the 
 spacecraft and the gravity forces acting on it were plotted. 
 
 <img src="spacecraft_swingby/data/trajectory.png" width="500">
