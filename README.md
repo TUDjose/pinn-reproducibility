@@ -133,7 +133,59 @@ as minimal as the method would lead it to be) and thrust values are noisier.
 
 ## Shortest Path
 
-## Spaceship Landing
 
+---
+
+## Reproduction on a new example
+_by Mathijs van Binnendijk_
+
+In order to see if  PINN architecture proposed would extend to use cases apart from the ones used in the paper, a new example use case was derived. Requirements for the new use case were set to allow for a goal, boundary conditions, and a environment governed by physics equations. The next section will describe this new use case used as an experiment.
+
+### Method
+The experiment performed was based around getting the PINN to predict the landing trajectory of a spacecraft in one dimension. A graphical description of the problem can be seen in the following figure.
+
+<img src="spaceship_landing/experiment.png" width="800">
+
+The PINN takes the time $t$ as an input and as an output it generates the propulsion force $F_{thrust}$ and the distance to ground $d$ for the given input time. Essentially it predicts the decent path of the landing and accompanying thrust required to follow this decent path.
+#### Physics
+The equation governing the acceleration of the spacecraft can be written down as:
+$$\frac{F_{thrust}}{m} − g - \ddot{d} = 0$$
+This means we can describe the residual of the governing physics equation by:
+$$\mathcal{F}(t, d)= \frac{F_{thrust}(t)}{m} − g - \ddot{d}(t)$$
+This can be used to evaluate the physics loss 
+$$L_{phys}(d)=\frac1{N_{\Omega}}\sum_{j=1}^{N_{\Omega}}\|\mathcal{F}(t_j;d)\|_2^2\mathrm{~for~}t_j\in\Omega.$$
+* $L_{phys}(d)$: This is the physics loss, which quantifies the deviation of the neural network predictions from the governing physics equations.
+* $\frac1{N_{\Omega}}\sum_{j=1}^{N_{\Omega}}$: This part calculates the average over a set of samples within the domain $\Omega$. $N_{\Omega}$ represents the number of samples taken within the domain.
+* $\| \mathcal{F}(t_j; d) \|_2^2$: This term measures the squared Euclidean norm of the residual function $\mathcal{F}(t_j; d)$ at each sample point $t_j$ within the domain. Here, $\mathcal{F}(t_j; d)$ represents the residual of the governing physics equation at time $t_j$ given by the distance $d$.
+
+#### Conditions and constraints
+The initial conditions are given by:
+$$\{ d,\dot{d},\ddot{d}, F_{trust} \} = \{ 0,0,-g, 0 \} \; \textup{at} \; t = 0 \; \textup{s}$$
+The maximum thrust is limited and cannot be negative meaning $0 \leq  F_{thrust} \leq F_{max}$ . This is not enforced by implementing this boundary in the loss function but by limiting the output range of the network. The initial conditions lead to the following constraint loss function:
+$$L_{const} = w_{21} d^{2} + w_{22} \dot{d}^{2} + w_{23} (\ddot{d} + g)^{2} + w_{24} F_{thrust}^{2}\: \textup{at}\:  t = 0 \textup{s}$$
+here all instances of $w$ indicate weights.
+#### Goal
+From an initial state with height $d$, velocity $v$, and acceleration $a$ we would like to end up at ground level ($d = 0$) with no velocity ($\dot{d} = 0$) at time $t_{end}$. This will be considered a successful landing. This leads to 
+$$L_{goal} = w_{31} d^{2} + w_{32} \dot{d}^{2} \: \textup{at}\:  t = t_{end}$$
+#### Combining all the losses
+Combining the losses lead to the following optimisation problem.
+$$\operatorname*{argmin}_{}\{w_{\mathrm{phys}}L_{\mathrm{phys}}+w_{\mathrm{con}}L_{\mathrm{con}}+w_{\mathrm{goal}}L_{\mathrm{goal}}\}$$
+
+### Results
+The results of the PINN output are given in the figure below. In order to verify the results a simulation was carried out based on the thrust curve the PINN generated and the same initial conditions. 
+
+<img src="spaceship_landing/results_initial.jpeg" width="800">
+
+The results show that the simulated results roughly align with the PINN prediction. However, it is clear that there is still quite a big gap between the predicted distance to the ground and the simulated result. The acceleration plot gives a hint as to why this is potentially the case. Here we can see the predicted downwards acceleration near the beginning of the time domain does not match the simulation. This indicates the network is unable to accurately produce the distance decent at the start of the simulation. Ideally the physics loss function should prevent this initial acceleration error. This did not happen however, likely because the estimation error is averaged over all acceleration values. This means this narrow error peak near the beginning is averaged out and overall does not have a significant influence on the loss value. Increasing the weights for physics loss somewhat elevates this issue but results in worse performance for other evaluated elements such as initial conditions reproduction by the network. A strategy that did work in terms of improving this issue was to make the weights of the physics loss depend on time. Increasing the weights near the beginning of the simulation and decreasing the weights near the end. This yielded the following results where both the acceleration of the network output matched the simulation as well as the initial conditions being approximately correct. Though not perfect, this is also the best result achieved in terms of meeting the goal conditions.
+
+<img src="spaceship_landing/results_variable_weights.jpeg" width="800">
+
+### A discussion on weights
+Based on reproducing the results of the paper for a new experiment it became clear the technique of PINN usage for optimisation tasks is promising. However, it also shined a light on some of the limitations of this method. The main limitation seemed to be the amount of weights one is required to set in order to train the PINN successfully. The paper makes it seem like just three weights are required, one for physics, one for initial conditions, and finally one for the goal. During the experience of designing a new experiment it became clear that this is rather optimistic. For this experiment it was the case that one weight was needed for all the sub elements of the losses as well. For example, the constraint loss needed a weight for all the initial conditions, namely distance, velocity, acceleration and force. Not doing this runs the risk of only optimising conditions with overall higher residuals and leaving out he conditions with relatively little influence on the loss. Exacerbating this issue is the possibility of constant weights not being sufficient. For example, weights varying over time had to be used for the physics loss in order to punish the larger errors in estimating the acceleration near the beginning of the simulation. This exposes a different part of the weights issue, namely that multiplying an average of residuals over time with a constant weight is not a always a sufficient approach. Sometimes a variable weight over the domain might be required.
+
+### Conclusion
+It is clear that deciding on weights might not be as simple as the problems the paper chooses to discuss would make it seem. However, with proper time put in tuning all different weights, the method proposed in the paper seems to be able to give good results when used on problems other than those discussed in the paper. Whether this promise translates to a larger set of problem types would need further experimentation and validation.
+
+---
 
 [^X] Seo, J. Solving real-world optimization tasks using physics-informed neural computing. Sci Rep 14, 202 (2024). https://doi.org/10.1038/s41598-023-49977-3
