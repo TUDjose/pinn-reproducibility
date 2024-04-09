@@ -1,7 +1,7 @@
 # PINN Blogpost
 
 Authors Group 9:
-- Mathijs van Binnendijk (xxx)
+- Mathijs van Binnendijk (4583957)
 - José Cunha (5216087)
 - Lucas van Mol (xxx)
 - Nicolas Farjado Ramirez (xxx)
