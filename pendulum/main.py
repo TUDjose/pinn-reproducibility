@@ -24,13 +24,25 @@ m = 1
 l = 1
 g = 9.8
 
+# Training parameters
 n_adam = 5000
 n_domain = 1000
 device = "cpu"
-
+adam_lr = 2e-2
+lbfgs_lr = 1
 
 class FNN(nn.Module):
+    """
+    Fully connected neural network model.
+    """
+
     def __init__(self, layers):
+        """
+        Initialize the FNN model.
+
+        Args:
+            layers (list): List of layer sizes.
+        """
         super().__init__()
 
         self.linears = nn.ModuleList([
@@ -42,9 +54,17 @@ class FNN(nn.Module):
         for layer in self.linears:
             nn.init.xavier_normal_(layer.weight)
             nn.init.zeros_(layer.bias)
-            # nn.init.xavier_normal_(layer.bias)
 
     def forward(self, x):
+        """
+        Forward pass of the FNN model.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         for layer in self.linears[:-2]:
             x = self.activation(layer(x))
 
@@ -52,15 +72,29 @@ class FNN(nn.Module):
 
 
 class PendulumPINN(FNN):
+    """
+    Physics-Informed Neural Network (PINN) model for the Pendulum problem.
+    """
+
     def __init__(self):
+        """
+        Initialize the PendulumPINN model.
+        """
         # Time domain input
         # Theta, Torque output
         super().__init__([1] + [64] * 3 + [2])
 
     def forward(self, x):
+        """
+        Forward pass of the PendulumPINN model.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         x = super().forward(x)
-        # theta, torque = x.T
-        # x = torch.stack([theta, F.tanh(torque) * max_torq]).T
         return x
 
 
@@ -68,6 +102,19 @@ theta_t = None
 theta_tt = None
 losses = []
 def pinn_loss(theta, torq, t, loss_weights=[10, 1, 1], save_losses=True):
+    """
+    Calculate the PINN loss.
+
+    Args:
+        theta (torch.Tensor): Theta tensor.
+        torq (torch.Tensor): Torque tensor.
+        t (torch.Tensor): Time tensor.
+        loss_weights (list, optional): List of loss weights. Defaults to [10, 1, 1].
+        save_losses (bool, optional): Whether to save the losses. Defaults to True.
+
+    Returns:
+        torch.Tensor: PINN loss.
+    """
     # Calculate derivatives
     global theta_t
     global theta_tt
@@ -103,11 +150,16 @@ def pinn_loss(theta, torq, t, loss_weights=[10, 1, 1], save_losses=True):
     return L_con + L_phys + L_goal
 
 
-
-
 def sample_points(tmin, tmax):
     """
     Sample n_domain points in the interval [tmin, tmax], including the endpoints.
+
+    Args:
+        tmin (float): Minimum time value.
+        tmax (float): Maximum time value.
+
+    Returns:
+        torch.Tensor: Sampled points tensor.
     """
     points = [tmin]
     points += [random.uniform(tmin, tmax) for _ in range(n_domain-2)]
@@ -122,6 +174,14 @@ def sample_points(tmin, tmax):
 
 
 def train(model, optimizer, steps):
+    """
+    Train the model.
+
+    Args:
+        model (nn.Module): Model to train.
+        optimizer (torch.optim.Optimizer): Optimizer for training.
+        steps (int): Number of training steps.
+    """
     # set model to training mode
     model.train()
 
@@ -161,13 +221,14 @@ def train(model, optimizer, steps):
         return loss
 
     print("L-BFGS..")
-    optimizer = torch.optim.LBFGS(model.parameters(), lr=1)
+    optimizer = torch.optim.LBFGS(model.parameters(), lr=lbfgs_lr)
     time_domain = torch.linspace(tmin, tmax, n_domain)
     time_domain = time_domain.reshape((n_domain, 1))
     time_domain.requires_grad = True
 
     try:
         for n in range(steps):
+            # Resample (optional)
             # if n % period == 0:
             #     time_domain = sample_points(tmin, tmax)
             optimizer.step(lambda: closure(time_domain, save_losses=False))
@@ -179,6 +240,12 @@ def train(model, optimizer, steps):
 
 
 def plot_output(model):
+    """
+    Plot the output of the model.
+
+    Args:
+        model (nn.Module): Trained model.
+    """
     model.eval()
     time_domain = torch.linspace(tmin, tmax, n_domain)
     time_domain = time_domain.reshape((n_domain, 1))
@@ -196,6 +263,8 @@ def plot_output(model):
     plt.plot(time_domain.detach().numpy(), [
              torch.tanh(y[1]) for y in u], label="torque")
     plt.legend()
+    plt.xlabel("Time")
+    plt.ylabel("rad/Nm")
 
     # Plot losses
     plt.subplot(1, 2, 2)
@@ -204,9 +273,15 @@ def plot_output(model):
     plt.plot([x[2].detach().numpy() for x in losses], label="goal")
     plt.semilogy()
     plt.legend()
+    plt.suptitle("Learned function (left) and losses during training (right)")
+    plt.xlabel("Iteration")
+    plt.ylabel("Loss")
 
     plt.gcf().set_size_inches(12, 5)
-    plt.savefig(f"runs/run_{datetime.now().strftime('%Y%m%d%H%M%S')}.png")
+    try: 
+        plt.savefig(f"runs/run_{datetime.now().strftime('%Y%m%d%H%M%S')}.png")
+    except FileNotFoundError:
+        print("Couldn't save image")
     plt.show()
 
 
@@ -216,7 +291,7 @@ if __name__ == "__main__":
 
     print("Training..")
 
-    train(net, torch.optim.Adam(net.parameters(), lr=2e-2), n_adam)
+    train(net, torch.optim.Adam(net.parameters(), lr=adam_lr), n_adam)
 
     print("Plotting..")
 
