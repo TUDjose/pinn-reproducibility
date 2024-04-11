@@ -3,7 +3,7 @@
 Authors Group 9:
 - Mathijs van Binnendijk (4583957)
 - José Cunha (5216087)
-- Lucas van Mol (xxx)
+- Lucas Van Mol (6059686)
 - Nicolas Farjado Ramirez (xxx)
 
 
@@ -16,23 +16,40 @@ proposed architecture.
 
 
 <!-- TOC -->
-* [Pendulum](#pendulum)
-  * [Existing code](#existing-code)
-  * [Own implementation](#own-implementation)
-* [Spacecraft Swingby](#spacecraft-swingby)
-  * [Paper implementation and existing code](#paper-implementation-and-existing-code)
-  * [Own implementation](#own-implementation-1)
-* [Shortest Path](#shortest-path)
-* [Spaceship Landing](#spaceship-landing)
+- [PINN Blogpost](#pinn-blogpost)
+  - [Pendulum](#pendulum)
+    - [Existing code](#existing-code)
+    - [Own implementation](#own-implementation)
+  - [Spacecraft Swingby](#spacecraft-swingby)
+    - [Paper implementation and existing code](#paper-implementation-and-existing-code)
+    - [Own implementation](#own-implementation-1)
+  - [Shortest Path](#shortest-path)
+  - [Reproduction on a new example](#reproduction-on-a-new-example)
+    - [Method](#method)
+      - [Physics](#physics)
+      - [Conditions and constraints](#conditions-and-constraints)
+      - [Goal](#goal)
+      - [Combining all the losses](#combining-all-the-losses)
+    - [Results](#results)
+    - [A discussion on weights](#a-discussion-on-weights)
+    - [Conclusion](#conclusion)
 <!-- TOC -->
 
 
 ## Pendulum
 
+In this example, a pendulum is attached to a low-torque actuator, and the PINN has been given the objective to invert the pendulum such that $cos(\theta) = -1$. 
+The idea is that the network should learn to swing the pendulum in order to accumulate enough energy for inversion.
+The network has one input, time $t$, and two outputs angle $\theta$ and torque $\tau$.
+It then acts like a function approximator, with the aim to learn the trajectory over time of the pendulum with the given objective:
+
+$$
+f: t \mapsto \theta, \tau
+$$
+
 ### Existing code
 
-We found that the code used by the developer is flakier than the paper might suggest. In `data/pendulum` the code sets a random seed as 
-such:
+We found that the paper's code is flakier than the paper might suggest. In the author's code (`data/pendulum/main.py`) the code sets a random seed as such:
 
 ```python
 # Set random seed
@@ -49,14 +66,19 @@ random sampling of X runs with the above lines omitted:
 
 ### Own implementation
 
-- Point resampling is important
-- learning rates and coefficients are important, and depend on the implementation. For example, learning rates had to be lowered when 
-  point resampling wasn't implemented 
-- about 1 in X runs actually converges to something nice
-- average time for a run
-  - (did not have time to optimize this)
-- 
-![run1](pendulum/runs/run_20240404114459.png)
+In our own implementation, we use the paper to implement the PINN in PyTorch, attempting to make minimal use of the author-provided code.
+We found that a few details, not explicity mentioned by the paper, were crucial to getting the reimplementation to work.
+One such detail is point resampling. Initially, we used a grid-sampling technique, using `np.linspace()`, to sample points between $t_{min}$ and $t_{max}$. 
+However, changing this to be a random uniform sampling of points, resampled every 100 iterations, improved the network's ability to converge. 
+We did need to make sure that the extremes $t_{min}$ and $t_{max}$ were always included in the sampling, such that the network could efficiently learn the constraints on the initial conditions and on the final objective state.
+
+
+An example run of our implementation is shown below. We use the same hyperparameters as in the paper, and note that we do not get such a result every time - usually multiple runs are needed before getting a result with sufficiently low loss.
+
+![run1](pendulum/runs/example_run.png)
+
+The time to train is within the same order of magnitude as the paper. Of course, this ignores the unfortunate fact that one has to do multiple runs in order to get a satisfying result.
+
 
 ## Spacecraft Swingby
 
