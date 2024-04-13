@@ -1,4 +1,4 @@
-# PINN Blogpost
+# Reproduction Report: *Solving real-world optimization tasks using phyiscs-informed neural computing*
 
 Authors Group 9:
 - Mathijs van Binnendijk (4583957)
@@ -8,17 +8,17 @@ Authors Group 9:
 
 
 In this blog post we attempt to reproduce the paper *Solving real-world optimization tasks using physics-informed neural computing*[^X].
-It introduces a "goal loss" to the loss function of traditional Physics-Informed Neural Networks (PINNs) in order to optimize for certain tasks.
+The paper introduces a "goal loss" to the loss function of traditional Physics-Informed Neural Networks (PINNs) in order to optimize for certain tasks.
 The paper's code is [available on GitHub](https://github.com/jaem-seo/pinn-optimization/tree/b65a4982283d46be4c817d8e3157ca68c39ed88c) 
 and uses the [DeepXDE](https://github.com/lululxvi/deepxde) library to implement the PINNs. We reproduce three of the examples produced 
 in the paper by writing the network in pure PyTorch, and include a [new example](#spaceship-landing) in order to further test the 
 capabilities if the
-proposed architecture.
+proposed architecture. The code for our reproduction is available online at https://github.com/TUDjose/pinn-reproducibility.
 
 ![network architecture](network_architecture.webp)
 
 <!-- TOC -->
-- [PINN Blogpost](#pinn-blogpost)
+- [Reproduction Report: *Solving real-world optimization tasks using phyiscs-informed neural computing*](#reproduction-report-solving-real-world-optimization-tasks-using-phyiscs-informed-neural-computing)
   - [Pendulum](#pendulum)
     - [Existing code](#existing-code)
     - [Own implementation](#own-implementation)
