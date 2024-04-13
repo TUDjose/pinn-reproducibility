@@ -8,12 +8,14 @@ Authors Group 9:
 
 
 In this blog post we attempt to reproduce the paper *Solving real-world optimization tasks using physics-informed neural computing*[^X].
+It introduces a "goal loss" to the loss function of traditional Physics-Informed Neural Networks (PINNs) in order to optimize for certain tasks.
 The paper's code is [available on GitHub](https://github.com/jaem-seo/pinn-optimization/tree/b65a4982283d46be4c817d8e3157ca68c39ed88c) 
 and uses the [DeepXDE](https://github.com/lululxvi/deepxde) library to implement the PINNs. We reproduce three of the examples produced 
 in the paper by writing the network in pure PyTorch, and include a [new example](#spaceship-landing) in order to further test the 
 capabilities if the
 proposed architecture.
 
+![network architecture](network_architecture.webp)
 
 <!-- TOC -->
 - [PINN Blogpost](#pinn-blogpost)
@@ -41,15 +43,35 @@ proposed architecture.
 In this example, a pendulum is attached to a low-torque actuator, and the PINN has been given the objective to invert the pendulum such that $cos(\theta) = -1$. 
 The idea is that the network should learn to swing the pendulum in order to accumulate enough energy for inversion.
 The network has one input, time $t$, and two outputs angle $\theta$ and torque $\tau$.
-It then acts like a function approximator, with the aim to learn the trajectory over time of the pendulum with the given objective:
+It then acts like a function approximator, with the aim to learn the trajectory of the pendulum over time, constrained by physics laws, boundary conditions and objective angle:
 
 $$
 f: t \mapsto \theta, \tau
 $$
 
+There are three losses the network aims to minimize. The first is the physics loss, ensuring that forces are conserved:
+
+$$\mathcal{F}=m l^{2}\ddot{\theta}-(\tau-m g l\sin\theta),$$
+
+where $\tau$ is the torque, limited by $|\tau| = 1.5~\text{Nm}$. The L2 norm of $\mathcal{F}$ is averaged over the time domain to give the physics loss $L_{phys}$.
+
+Boundary conditions are achieved through the constraint loss. In this example, we want $\theta, \dot{\theta}, \tau = 0$ at $t=0$.
+
+$$
+L_{con} = (\theta_{t=0})^2 + (\dot{\theta}_{t=0})^2 + (\tau_{t=0})^2
+$$
+
+
+
+In a similar way, the goal loss is defined as:
+
+$$L_{g o a l}=(\cos\theta_{t=t_{f}}-(-1))^{2}$$
+
+The final loss is then calculated as a weighted average of these three losses.
+
 ### Existing code
 
-We found that the paper's code is flakier than the paper might suggest. In the author's code (`data/pendulum/main.py`) the code sets a random seed as such:
+We found that the paper's code is flakier than the paper might suggest. In the author's code, under `data/pendulum/main.py`, the code sets a random seed as such:
 
 ```python
 # Set random seed
@@ -59,15 +81,14 @@ tf.random.set_seed(seed)
 dde.backend.tf.random.set_random_seed(seed)
 ```
 
-and indeed the code runs well when run like this. However, removing the set seed does not always give good results. Here we present a 
-random sampling of X runs with the above lines omitted:
+and indeed we are able to reproduce the results with this given seed. However, removing the set seed does not always give good results. Running the author's code 100 times with a random seed gave us:
 
 
 
 ### Own implementation
 
 In our own implementation, we use the paper to implement the PINN in PyTorch, attempting to make minimal use of the author-provided code.
-We found that a few details, not explicity mentioned by the paper, were crucial to getting the reimplementation to work.
+We found that a few details, not explicitly mentioned by the paper, were crucial to getting the reimplementation to work.
 One such detail is point resampling. Initially, we used a grid-sampling technique, using `np.linspace()`, to sample points between $t_{min}$ and $t_{max}$. 
 However, changing this to be a random uniform sampling of points, resampled every 100 iterations, improved the network's ability to converge. 
 We did need to make sure that the extremes $t_{min}$ and $t_{max}$ were always included in the sampling, such that the network could efficiently learn the constraints on the initial conditions and on the final objective state.
@@ -76,6 +97,13 @@ We did need to make sure that the extremes $t_{min}$ and $t_{max}$ were always i
 An example run of our implementation is shown below. We use the same hyperparameters as in the paper, and note that we do not get such a result every time - usually multiple runs are needed before getting a result with sufficiently low loss.
 
 ![run1](pendulum/runs/example_run.png)
+
+The figure above shows our implementation working for the pendulum example. On the left, we see that the network has learned to modulate the torque, causing the maximum pendulum angle to increase until inversion.
+
+On the right, we see how the network optimizes:
+- physics loss, defined by the gravitational and pendulum governing laws
+- constraint loss, ensuring the pendulum starts at $\theta=0$ with $0$ velocity
+- goal loss, ensuring the pendulum is at $\theta=\pi$ when $t=10$.
 
 The time to train is within the same order of magnitude as the paper. Of course, this ignores the unfortunate fact that one has to do multiple runs in order to get a satisfying result.
 
@@ -109,7 +137,7 @@ $$
 
 The paper's implementation mentions the following configurations to train the network:
 - learning rate = $0.001$
-- loss weigts = $\{w_{phys}, w_{con}\} = \{1, 1\}$
+- loss weights = $\{w_{phys}, w_{con}\} = \{1, 1\}$
 - Adam optimizer epochs = $2000$
 - L-BFGS optimizer until convergence ($1215$ epochs needed)
 - $T$ is a trainable parameter that acts as a normalization factor
@@ -118,10 +146,10 @@ The paper however omits the method in which the variable $T$ is trained, and thi
 using the [DeepXDE](https://github.com/lululxvi/deepxde) library. As shall be mentioned in the following section, the configuration used 
 by the paper seems to be only valid when using the specific library, as the total loss tends to never decrease enough to obtain accurate 
 results. Looking at the existing code, something that is not mentioned in the paper is the resampling of input values, which occurs 
-every 100 epochs. This method proved useful in reducing the total loss when a plateu was found. Similarly, the trainable parameter $T$ 
+every 100 epochs. This method proved useful in reducing the total loss when a plateau was found. Similarly, the trainable parameter $T$ 
 is only updated every 10 epochs, again omitted in the paper (along with any other mention of the training of $T$), though this larger 
 training period did not seem to greatly affect the final results. Given this information, the paper is relatively incomplete for 
-attempting a reprodution of the spacecraft swingby results, however, the provided code was useful in understanding the network 
+attempting a reproduction of the spacecraft swingby results, however, the provided code was useful in understanding the network 
 architecture and the training steps taken.
 
 
