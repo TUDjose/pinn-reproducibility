@@ -184,23 +184,26 @@ before,  though with a sigmoid activation function for the output layer, as the 
 of these two similar problems was not as successful as the previous ones. The total loss was not able to decrease to the same extent as 
 the spacecraft swingby or inverted pendulum problem, and the results were not as accurate. 
 An initial test keeping all the training parameters the same was performed, results for Fermat's problem are presented in the following image:
-![Shortest Path Solutions](images/fermat_initial.png)
+![Fermat with initial weights](images/fermat_initial.png)
 
 This image shows the shortest path encountered on the left side, while the loss progression on the right side. As mentioned before, the results weren't as accurate as the ones presented in the paper, the path achieved being only a straight line that does not even reach the boundary conditions ($(0,0)$ and $(1,1)$), and the loss, while displaying a quick reduction to a constant value, is still quite high, specially when compared to the losses of the previous problems.
 
 The results for the brachistochrone using the same training conditions are presented in the following figure:
-![Shortest Path Solutions](images/brach_initial.png)
+![Brachistocrone with initial weights](images/brach_initial.png)
 
 Similarly to Fermat's problem, in this case the path achieved was a straight line that does not reach the boundary conditions ($(1,0)$, $(0,1)$) and the losses are quite high.
 
 Several tests doing some alterations to the losses' weights were done, in order to look for a better solution. However, these did not successfully return the proper best path shown as the analytical solution in the paper.
 
 For the case of Fermat's problem, the best solution found was upon assigning the constraint loss a weight of 5 while keeping the other ones the same:
-![Shortest Path Solutions](images/fermat_best.png)
+![Fermat with new weights](images/fermat_best.png)
 
-In contrast to the initial solution, this one displays the correct initial conditions in the path. However, it is still a straight line with high losses
+In contrast to the initial solution, this one displays the correct initial conditions in the path. However, it is still a straight line with high losses. 
 
+As for the brachistochrone curve problem, even though similar tests were made, no proper solution was found either. A solution found using weights of $[5.0,1.0,0.1]$ for constraint, physics, and goal losses is found in the next image:
+![Brachistocrone with new weights](images/brach_best.png)
 
+similarly to the issues presented in fermat's problem, the resulting path is only a straight line that does not follow the initial conditions.
 
 In sum, unfortunately, reproduction of the shortest path problems was not successful, and the results were not as accurate as the paper. Possibly further changes to the training parameters could help in achieving better results, or perhaps a more complex/different network architecture. 
 
