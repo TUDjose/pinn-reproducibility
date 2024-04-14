@@ -4,7 +4,7 @@ Authors Group 9:
 - Mathijs van Binnendijk (4583957)
 - José Cunha (5216087)
 - Lucas Van Mol (6059686)
-- Nicolas Farjado Ramirez (xxx)
+- Nicolás Farjado Ramírez (5918340)
 
 
 In this blog post we attempt to reproduce the paper *Solving real-world optimization tasks using physics-informed neural computing*[^X].
@@ -193,51 +193,74 @@ as minimal as the method would lead it to be) and thrust values are noisier.
 ---
 
 ## Shortest Path
-_by José Cunha_
+_by Nicolás Fajardo Ramírez_
 ### Paper implementation and existing code
 
-Another problem suggested in the paper is the shortest path problem. The network is trained to find the shortest path between two points 
-under two different physics constraints, namely the light path of shortest time in a medium with varying refractive index (Fermat's 
-principle), and the shortest time path under gravity (brachistochrone problem). The two physics functions and boudary conditions are 
-defined below, where $c=1$ is the speed of light and $n$ the refractive index of the medium.
+The other problem presented in the paper is to find the shortest between two points. This general problem was explored in two different applications: Fermat's principle of least time, and brachistochrone curves.
 
+**Fermat's Principle**
+Fermat's principle of least time states that the path a light ray follows to go from point a point $A$ to a point $B$ is the path that can be traversed in the least time. This principle explains the refraction of light, as its path gets bended upon changes of the refraction in the medium. 
+
+In order to find the shortest-time path of light, the following starting conditions and physics' loss expression are defined:
 $$
 \mathcal{F}_{Fermat} = \left(\frac1{T}\frac{dx}{dt_N}\right)^2 + \left(\frac1{T}\frac{dy}{dt_N}\right)^2 - \left(\frac{c}{n}\right)^2
 $$
 $$
-\mathcal{F}_{brach} = gy_0 - gy - \frac12 \left( \left( \frac1{T}\frac{dx}{dt_N} \right)^2 + \left(\frac1{T}\frac{dy}{dt_N} \right)^2\right) 
-$$
-$$
 (x, y)_{Fermat} = \begin{cases} (0, 0), \quad t_N = 0 \\
 (1, 1), \quad t_N = 1\end{cases}
+$$
+
+Note that in the equation, $c$ refers to the speed of light in a vaccum, and $n$ is the refractive index of the medium.
+
+Since the objective is to find the shortest path (the path of least time), the goal loss is defined as $ \mathcal{L}_{goal} = T $, since the time $T$ that light takes to go from point $A$ to point $B$ is the value to be minimized.
+
+**Brachistochrone Curve**
+A brachistochrone curve, or shortest-time descent curve, is the path from point $A$ to point $B$ that ensures the shortest travel that can be achievable while under the effects of gravity $g$.
+
+In order to find this shortest-descent curve, starting conditions and physics' loss are defined:
+
+$$
+\mathcal{F}_{brach} = gy_0 - gy - \frac12 \left( \left( \frac1{T}\frac{dx}{dt_N} \right)^2 + \left(\frac1{T}\frac{dy}{dt_N} \right)^2\right) 
 $$
 $$
 (x, y)_{brach} = \begin{cases} (0, 1), \quad t_N = 0 \\
 (1, 1), \quad t_N = 1\end{cases}
 $$
 
-The goal is to minimize the time taken to reach the final point, encapsulated in the goal loss as $ \mathcal{L}_{goal} = T $, where $T$ 
-is the time taken from the starting point to the endpoint, is unknown, and a trainable parameter. For both cases, an analytical approach 
-can be taken to find the shortest path, which can be then compared to the PINN solution. The paper does not provide the analytical 
-solution, though it can be found from the code provided. Considering the training parameters, similar configurations to the other 
-problems presented are used, with the same learning rates ($0.001$) and the loss weights ($\{w_{phys}, w_{con}, w_{goal}\} = \{1, 1, 0.
-01$). The weight of the goal loss is much smaller than the other losses to prioritize satisfying the governing equation and the boundary 
-conditions over reducing the time taken. Again, the paper  does not mention the training of the variable $T$, nor the resampling of the 
-input.
+Similarly to the light refraction problem, as the objective is to minimize the time to traverse the path, the time $T$ is selecte as the goal loss.
+
+For both of the sub-problems, most of the same training parameters are the same: Adam optimizer steps set to $2000$, learning rate set to $0.001$, and loss weights are set to $1$, $1$, and $0.01$ for the constarint, physics, and goal losses respectively (in order to give more weight ot the satisfaction of the physicall principle rather than the time's minimization). The only training parameter that was changed depending on the problem was the number of steps for the LBFGS optimizer, which was $1232$ for the Fermat's principle problem, while being $2692$ for the brachistochrone curve.
+
+The paper states that an analytical and RL approaches can be taken to compare the PINN solution:
+
+![Shortest Path Solutions](images/shortest-path-initial.jpg)
+
+Figre a shows the paths achieved by the different solution approaches for the light's path, while figure b does so for the brachistochrone curve.
 
 ### Own implementation
 
 Using the knowledge gained from the previous problems, the shortest path problem was implemented using the same network architecture as 
 before,  though with a sigmoid activation function for the output layer, as the output is bounded between $0$ and $1$. However, training 
 of these two similar problems was not as successful as the previous ones. The total loss was not able to decrease to the same extent as 
-the spacecraft swingby problem, and the results were not as accurate. The training parameters were initially kept the same as in the 
-paper, and then adjusted to try and reduce the loss, which somewhat helped, though the results were still not nearly as accurate as the 
-paper, and do not reflect the analytic solution. The results of the trajectories of the two shortest path problems (Fermat's priciple 
-and brachistochrone) are shown below, compared to the analytical solutions.
+the spacecraft swingby or inverted pendulum problem, and the results were not as accurate. 
+An initial test keeping all the training parameters the same was performed, results for Fermat's problem are presented in the following image:
+![Shortest Path Solutions](images/fermat_initial.png)
 
-<img src="shortest_path/data/trajectory.png" width="550">
+This image shows the shortest path encountered on the left side, while the loss progression on the right side. As mentioned before, the results weren't as accurate as the ones presented in the paper, the path achieved being only a straight line that does not even reach the boundary conditions ($(0,0)$ and $(1,1)$), and the loss, while displaying a quick reduction to a constant value, is still quite high, specially when compared to the losses of the previous problems.
 
-<img src="shortest_path/data/trajectory_b.png" width="500">
+The results for the brachistochrone using the same training conditions are presented in the following figure:
+![Shortest Path Solutions](images/brach_initial.png)
+
+Similarly to Fermat's problem, in this case the path achieved was a straight line that does not reach the boundary conditions ($(1,0)$, $(0,1)$) and the losses are quite high.
+
+Several tests doing some alterations to the losses' weights were done, in order to look for a better solution. However, these did not successfully return the proper best path shown as the analytical solution in the paper.
+
+For the case of Fermat's problem, the best solution found was upon assigning the constraint loss a weight of 5 while keeping the other ones the same:
+![Shortest Path Solutions](images/fermat_best.png)
+
+In contrast to the initial solution, this one displays the correct initial conditions in the path. However, it is still a straight line with high losses
+
+
 
 In sum, unfortunately, reproduction of the shortest path problems was not successful, and the results were not as accurate as the paper. 
 Possibly further changes to the training parameters could help in achieving better results, or perhaps a more complex/different network 
