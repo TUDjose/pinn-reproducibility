@@ -7,7 +7,4 @@
     <orderEntry type="jdk" jdkName="condaInterp" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
-  <component name="PyDocumentationSettings">
-    <option name="renderExternalDocumentation" value="true" />
-  </component>
 </module>

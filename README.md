@@ -114,6 +114,8 @@ We find that a significant amount of runs end up with a loss of around 4 - this 
 ![author_losses](images/author_example.png)
 *The angle of the pendulum is shown in blue, and the torque is shown in orange. On the left is an example 'good run' of the author's code with a loss of 1e-4. On the right is a failed run, with a loss of ~4.* 
 
+---
+
 ## Spacecraft Swingby
 _by José Cunha_
 
@@ -137,8 +139,8 @@ $$
 $$
 (x, y) = 
 \begin{cases}
-    (-1, -1) \text{ at } t_N = 0 \\
-    \quad (1, 1) \text{ at } t_N = 1
+    (-1, -1), \quad t_N = 0 \\
+    \quad (1, 1), \quad t_N = 1
 \end{cases}
 $$
 
@@ -188,7 +190,58 @@ as minimal as the method would lead it to be) and thrust values are noisier.
 
 <img src="spacecraft_swingby/data/compare.png" width="500">
 
+---
+
 ## Shortest Path
+_by José Cunha_
+### Paper implementation and existing code
+
+Another problem suggested in the paper is the shortest path problem. The network is trained to find the shortest path between two points 
+under two different physics constraints, namely the light path of shortest time in a medium with varying refractive index (Fermat's 
+principle), and the shortest time path under gravity (brachistochrone problem). The two physics functions and boudary conditions are 
+defined below, where $c=1$ is the speed of light and $n$ the refractive index of the medium.
+
+$$
+\mathcal{F}_{Fermat} = \left(\frac1{T}\frac{dx}{dt_N}\right)^2 + \left(\frac1{T}\frac{dy}{dt_N}\right)^2 - \left(\frac{c}{n}\right)^2
+$$
+$$
+\mathcal{F}_{brach} = gy_0 - gy - \frac12 \left( \left( \frac1{T}\frac{dx}{dt_N} \right)^2 + \left(\frac1{T}\frac{dy}{dt_N} \right)^2\right) 
+$$
+$$
+(x, y)_{Fermat} = \begin{cases} (0, 0), \quad t_N = 0 \\
+(1, 1), \quad t_N = 1\end{cases}
+$$
+$$
+(x, y)_{brach} = \begin{cases} (0, 1), \quad t_N = 0 \\
+(1, 1), \quad t_N = 1\end{cases}
+$$
+
+The goal is to minimize the time taken to reach the final point, encapsulated in the goal loss as $ \mathcal{L}_{goal} = T $, where $T$ 
+is the time taken from the starting point to the endpoint, is unknown, and a trainable parameter. For both cases, an analytical approach 
+can be taken to find the shortest path, which can be then compared to the PINN solution. The paper does not provide the analytical 
+solution, though it can be found from the code provided. Considering the training parameters, similar configurations to the other 
+problems presented are used, with the same learning rates ($0.001$) and the loss weights ($\{w_{phys}, w_{con}, w_{goal}\} = \{1, 1, 0.
+01$). The weight of the goal loss is much smaller than the other losses to prioritize satisfying the governing equation and the boundary 
+conditions over reducing the time taken. Again, the paper  does not mention the training of the variable $T$, nor the resampling of the 
+input.
+
+### Own implementation
+
+Using the knowledge gained from the previous problems, the shortest path problem was implemented using the same network architecture as 
+before,  though with a sigmoid activation function for the output layer, as the output is bounded between $0$ and $1$. However, training 
+of these two similar problems was not as successful as the previous ones. The total loss was not able to decrease to the same extent as 
+the spacecraft swingby problem, and the results were not as accurate. The training parameters were initially kept the same as in the 
+paper, and then adjusted to try and reduce the loss, which somewhat helped, though the results were still not nearly as accurate as the 
+paper, and do not reflect the analytic solution. The results of the trajectories of the two shortest path problems (Fermat's priciple 
+and brachistochrone) are shown below, compared to the analytical solutions.
+
+<img src="shortest_path/data/trajectory.png" width="550">
+
+<img src="shortest_path/data/trajectory_b.png" width="500">
+
+In sum, unfortunately, reproduction of the shortest path problems was not successful, and the results were not as accurate as the paper. 
+Possibly further changes to the training parameters could help in achieving better results, or perhaps a more complex/different network 
+architecture. 
 
 ---
 
@@ -255,5 +308,6 @@ Based on reproducing the results of the paper for a new experiment it became cle
 ### Conclusion
 It is clear that deciding on weights might not be as simple as the problems the paper chooses to discuss would make it seem. However, with proper time put in tuning all different weights, the method proposed in the paper seems to be able to give good results when used on problems other than those discussed in the paper. Whether this promise translates to a larger set of problem types would need further experimentation and validation.
 
+---
 
 [^X]: Seo, J. Solving real-world optimization tasks using physics-informed neural computing. Sci Rep 14, 202 (2024). https://doi.org/10.1038/s41598-023-49977-3
