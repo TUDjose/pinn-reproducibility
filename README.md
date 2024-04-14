@@ -1,4 +1,4 @@
-# Reproduction Report: *Solving real-world optimization tasks using phyiscs-informed neural computing*
+# Reproduction Report: *Solving real-world optimization tasks using physics-informed neural computing*
 
 Authors Group 9:
 - Mathijs van Binnendijk (4583957)
@@ -15,13 +15,13 @@ in the paper by writing the network in pure PyTorch, and include a [new example]
 capabilities if the
 proposed architecture. The code for our reproduction is available online at https://github.com/TUDjose/pinn-reproducibility.
 
-![network architecture](network_architecture.webp)
+![network architecture](images/network_architecture.webp)
 
 <!-- TOC -->
-- [Reproduction Report: *Solving real-world optimization tasks using phyiscs-informed neural computing*](#reproduction-report-solving-real-world-optimization-tasks-using-phyiscs-informed-neural-computing)
+- [Reproduction Report: *Solving real-world optimization tasks using physics-informed neural computing*](#reproduction-report-solving-real-world-optimization-tasks-using-physics-informed-neural-computing)
   - [Pendulum](#pendulum)
-    - [Existing code](#existing-code)
     - [Own implementation](#own-implementation)
+    - [Comparison to existing code](#comparison-to-existing-code)
   - [Spacecraft Swingby](#spacecraft-swingby)
     - [Paper implementation and existing code](#paper-implementation-and-existing-code)
     - [Own implementation](#own-implementation-1)
@@ -39,6 +39,8 @@ proposed architecture. The code for our reproduction is available online at http
 
 
 ## Pendulum
+_by Lucas Van Mol_
+
 
 In this example, a pendulum is attached to a low-torque actuator, and the PINN has been given the objective to invert the pendulum such that $cos(\theta) = -1$. 
 The idea is that the network should learn to swing the pendulum in order to accumulate enough energy for inversion.
@@ -62,27 +64,11 @@ L_{con} = (\theta_{t=0})^2 + (\dot{\theta}_{t=0})^2 + (\tau_{t=0})^2
 $$
 
 
-
 In a similar way, the goal loss is defined as:
 
 $$L_{g o a l}=(\cos\theta_{t=t_{f}}-(-1))^{2}$$
 
 The final loss is then calculated as a weighted average of these three losses.
-
-### Existing code
-
-We found that the paper's code is flakier than the paper might suggest. In the author's code, under `data/pendulum/main.py`, the code sets a random seed as such:
-
-```python
-# Set random seed
-seed = 0
-np.random.seed(seed)
-tf.random.set_seed(seed)
-dde.backend.tf.random.set_random_seed(seed)
-```
-
-and indeed we are able to reproduce the results with this given seed. However, removing the set seed does not always give good results. Running the author's code 100 times with a random seed gave us:
-
 
 
 ### Own implementation
@@ -105,10 +91,31 @@ On the right, we see how the network optimizes:
 - constraint loss, ensuring the pendulum starts at $\theta=0$ with $0$ velocity
 - goal loss, ensuring the pendulum is at $\theta=\pi$ when $t=10$.
 
-The time to train is within the same order of magnitude as the paper. Of course, this ignores the unfortunate fact that one has to do multiple runs in order to get a satisfying result.
+The time to train is within the same order of magnitude as the paper. However, this ignores the unfortunate fact that one has to do multiple runs in order to get a satisfying result - a problem also present in the author's code, but not mentioned in the paper.
 
+### Comparison to existing code
+
+We found that the paper's code is flakier than the paper might suggest. In the author's code, under `data/pendulum/main.py`, the code sets a random seed as such:
+
+```python
+# Set random seed
+seed = 0
+np.random.seed(seed)
+tf.random.set_seed(seed)
+dde.backend.tf.random.set_random_seed(seed)
+```
+
+and indeed we are able to reproduce the results with this given seed. However, removing the set seed does not always give good results. To test the reliability of network training, we ran the author's code for the pendulum example 50 times, and examined the weighted sum of losses:
+
+![loss distribution](images/kde_losses.png)
+
+We find that a significant amount of runs end up with a loss of around 4 - this was characteristic of runs that were not able to reach the objective state. Instead, the network got stuck in a local minimum, applying 0 torque and the pendulum staying still. Out of 50 runs, 10 had losses of <1e-1, and 3 had losses <1e-3. Examples runs are shown below.
+
+![author_losses](images/author_example.png)
+*The angle of the pendulum is shown in blue, and the torque is shown in orange. On the left is an example 'good run' of the author's code with a loss of 1e-4. On the right is a failed run, with a loss of ~4.* 
 
 ## Spacecraft Swingby
+_by José Cunha_
 
 ### Paper implementation and existing code
 In the paper, the problem of finding the swingby trajectory of a spacecraft that can reach the given destination using the least amount of 
